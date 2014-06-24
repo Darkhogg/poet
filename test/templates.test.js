@@ -19,8 +19,8 @@ describe('Templating', function () {
 
     poet.init().then(function () {
       var posts = poet.posts;
-      posts['test1'].content.should.contain(pEl);
-      posts['test1'].content.should.contain(h1El);
+      posts['test-post-one'].content.should.contain(pEl);
+      posts['test-post-one'].content.should.contain(h1El);
       done();
     }).then(null, done);
   });
@@ -34,8 +34,35 @@ describe('Templating', function () {
 
     poet.init().then(function () {
       var posts = poet.posts;
-      posts['jadeTemplate'].content.should.contain(pEl);
-      posts['jadeTemplate'].content.should.contain(h1El);
+      posts['jade-test'].content.should.contain(pEl);
+      posts['jade-test'].content.should.contain(h1El);
+      done();
+    }).then(null, done);
+  });
+
+  it('should correctly compile jade with includes', function (done) {
+    var
+      app = express(),
+      poet = Poet(app, {
+        posts: './test/_postsJson'
+      });
+
+    poet.init().then(function () {
+      poet.posts['jade-test'].content.should.contain("Include Me!");
+      done();
+    }).then(null, done);
+  });
+
+
+  it('should correctly compile jade with app.locals.access', function (done) {
+    var
+      app = express(),
+      poet = Poet(app, {
+        posts: './test/_postsJson'
+      });
+    app.locals.foo = true;
+    poet.init().then(function () {
+      poet.posts['jade-test'].content.should.contain("foo is true");
       done();
     }).then(null, done);
   });
@@ -46,17 +73,16 @@ describe('Templating', function () {
       poet = Poet(app, {
         posts: './test/_postsJson'
       });
-    
+
     poet.addTemplate({
       ext: 'custom',
-      fn: function (s) {
-        s = s.replace(/\*(.*?)\*/g, '<$1>');
-        return s;
+      fn: function (opts) {
+        return opts.source.replace(/\*(.*?)\*/g, '<$1>');
       }
     }).init().then(function () {
       var posts = poet.posts;
-      posts['customTemplate'].content.should.contain(pEl);
-      posts['customTemplate'].content.should.contain(h1El);
+      posts['custom-test'].content.should.contain(pEl);
+      posts['custom-test'].content.should.contain(h1El);
       done();
     }).then(null, done);
   });
@@ -67,16 +93,16 @@ describe('Templating', function () {
       poet = Poet(app, {
         posts: './test/_postsJson'
       });
-    
+
     poet.addTemplate({
       ext: 'custom',
-      fn: function (s, callback) {
-        callback(null, s.replace(/\*(.*?)\*/g, '<$1>'));
+      fn: function (opts, callback) {
+        callback(null, opts.source.replace(/\*(.*?)\*/g, '<$1>'));
       }
     }).init().then(function () {
       var posts = poet.posts;
-      posts['customTemplate'].content.should.contain(pEl);
-      posts['customTemplate'].content.should.contain(h1El);
+      posts['custom-test'].content.should.contain(pEl);
+      posts['custom-test'].content.should.contain(h1El);
       done();
     }).then(null, done);
   });
@@ -87,10 +113,65 @@ describe('Templating', function () {
       poet = Poet(app, {
         posts: './test/_postsJson'
       });
-    
+
     poet.init().then(function () {
       var posts = poet.posts;
-      posts['test3'].content.should.contain(scriptBody);
+      posts['test-post-three'].content.should.contain(scriptBody);
+    });
+  });
+
+  describe('Errors', function() {
+
+    var realEnv;
+
+    beforeEach(function() { realEnv = process.env.NODE_ENV; });
+
+    afterEach(function() { process.env.NODE_ENV = realEnv; });
+
+  	it('should not appear in production', function (done) {
+      process.env.NODE_ENV = 'production';
+      var
+          app = express(),
+          poet = Poet(app, {
+            posts: './test/_postsWithErrorJson'
+          });
+      poet.init().then(function () {
+        Object.keys(poet.posts).should.have.length(1);
+        done();
+      }).then(null, done);
+    });
+
+    it('should be rendered in non production env', function (done) {
+      delete process.env.NODE_ENV;
+      var
+          app = express(),
+          poet = Poet(app, {
+            posts: './test/_postsWithErrorJson'
+          });
+
+      poet.init().then(function () {
+        var posts = poet.posts;
+        Object.keys(posts).should.have.length(2);
+        poet.posts['jade-test-with-error'].content.should.contain("> 3| Foo?");
+        done();
+      }).then(null, done);
+    });
+  });
+
+  it('should expose registered template engines on templateEngines', function () {
+    var
+      app = express(),
+      poet = Poet(app, {
+        posts: './test/_postsJson'
+      });
+
+    poet.templateEngines.marked.setOptions({
+      sanitize: true
+    });
+
+    poet.init().then(function () {
+      var posts = poet.posts;
+      posts['test-post-three'].content.should.not.contain(scriptBody);
     });
   });
 });
